@@ -1,16 +1,19 @@
-from math import remainder
-
 from PricingRule import PricingRule
 
 
-class SpecialPricingRule(PricingRule):
-    def __init__(self, unit_price, special_quantity, special_price):
-         self.unit_price = unit_price
-         self.special_quantity = special_quantity
-         self.special_price = special_price
+class SpecialPricing(PricingRule):
+    def __init__(self, sku: str, unit_price: int, special_quantity: int, special_price: int):
+        self.sku = sku
+        self.unit_price = unit_price
+        self.special_quantity = special_quantity
+        self.special_price = special_price
 
-    def calculate_pricing(self, quantity):
-        full_sets = quantity // self.special_quantity # 5 // 3 = 1 * special price applys to 1 set
-        remaining = quantity % self.special_quantity # 5 % 3 = 2 * unitprice applys to the remaining 2 items
+    def apply(self, item_counts):
+        count = item_counts.get(self.sku, 0)
+        special_sets = count // self.special_quantity
+        remainder = count % self.special_quantity
 
-        return self.special_price * full_sets + self.unit_price * remaining
+        total = (special_sets * self.special_price) + (remainder * self.unit_price)
+
+        item_counts[self.sku] = 0  # counted items removed
+        return total, item_counts
