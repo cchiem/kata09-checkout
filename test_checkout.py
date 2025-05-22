@@ -1,60 +1,108 @@
+import pytest
 from Checkout import Checkout
 from ComboPricingRule import ComboPricing
 from SpecialPricingRule import SpecialPricing
 from UnitPricingRule import UnitPricing
 
-RULES = [
-    ComboPricing(required_items={'A': 1, 'B': 1, 'C': 1}, combo_price=80),  # Combo: A + B + C = $80
-    SpecialPricing(sku='A', unit_price=50, special_quantity=3, special_price=130),  # 3A = $100
-    SpecialPricing(sku='B', unit_price=30, special_quantity=2, special_price=45),  # 3A = $100
-    UnitPricing(sku='C', unit_price=20),
-    UnitPricing(sku='D', unit_price=15),
-]
 
-def price(goods: str) -> int:
-    co = Checkout(RULES)
+@pytest.fixture
+def rules():
+    return [
+        ComboPricing(required_items={'A': 1, 'B': 1, 'C': 1}, combo_price=80),  # Combo: A + B + C = $80
+        SpecialPricing(sku='A', unit_price=50, special_quantity=3, special_price=130),  # 3A = $130
+        SpecialPricing(sku='B', unit_price=30, special_quantity=2, special_price=45),  # 2B = $45
+        UnitPricing(sku='C', unit_price=20),
+        UnitPricing(sku='D', unit_price=15),
+    ]
+
+
+def price(goods: str, rules) -> int:
+    co = Checkout(rules)
     for item in goods:
         co.scan(item)
     return co.total()
 
-def test_totals():
-    assert price("") == 0
-    assert price("A") == 50
-    assert price("AB") == 80
 
-    # 2 * A = 100
-    assert price("AA") == 100
+# ------------------------------------------
+# PARAMETERIZED TOTAL TESTS
+# ------------------------------------------
 
-    # 3A's = 130 special pricing
-    assert price("AAA") == 130
+@pytest.mark.parametrize("items, expected", [
+    ("", 0),
+    ("A", 50),
+    ("AB", 80),
+    ("AA", 100),
+    ("AAA", 130),              # Special pricing applies
+    ("AAAA", 180),
+    ("AAAAA", 230),
+    ("AAAAAA", 260),           # Two specials
+    ("AAAB", 160),
+    ("AAABB", 175),            # 3A special + 2B special
+    ("AAABBD", 190),           # + D unit
+    ("DABABA", 190),           # Same total in any scan variation
+])
+def test_pricing_combinations(items, expected, rules):
+    assert price(items, rules) == expected
 
-    assert price("AAAA") == 180
-    assert price("AAAAA") == 230
-    assert price("AAAAAA") == 260
-    assert price("AAAB") == 160
-    assert price("AAABB") == 175
 
-    # 3 A's for 130 + 2 B's for 45 + 1 D for 15 = 190
-    assert price("AAABBD") == 190
+# ------------------------------------------
+# UNIT PRICING
+# ------------------------------------------
 
-    # Same as above in any variation of scanning the item
-    assert price("DABABA") == 190
+@pytest.mark.parametrize("items, expected", [
+    ("C", 20),
+    ("D", 15),
+    ("CCCC", 80),
+    ("DDDD", 60),
+])
+def test_unit_prices(items, expected, rules):
+    assert price(items, rules) == expected
 
-def test_special_pricing():
-    # A B C = 100 special pricing
-    assert price("ABCA") == 130
-    assert price("AAABC") == 180
 
-def test_incremental():
-    co = Checkout(RULES)
+# ------------------------------------------
+# SPECIAL PRICING
+# ------------------------------------------
+
+def test_special_applies_then_unit(rules):
+    assert price("AAAA", rules) == 180     # 130 + 50
+    assert price("AABCAA", rules) == 210   # 130(A) + 80(combo)
+
+
+# ------------------------------------------
+# COMBO PRICING
+# ------------------------------------------
+
+def test_combo_applies_once(rules):
+    assert price("ABC", rules) == 80
+
+
+def test_combo_applies_then_unit(rules):
+    assert price("ABCA", rules) == 130     # 80 combo + 50 extra A
+
+
+# ------------------------------------------
+# INCREMENTAL SCANS
+# ------------------------------------------
+
+def test_incremental_total(rules):
+    co = Checkout(rules)
     assert co.total() == 0
     co.scan("A")
     assert co.total() == 50
     co.scan("B")
-    assert co.total() == 80
+    assert co.total() == 80                # Combo formed
     co.scan("A")
-    assert co.total() == 130
+    assert co.total() == 130               # 1A leftover, 2A = 100, 1B = 30
     co.scan("A")
-    assert co.total() == 160
+    assert co.total() == 160               # 3A = 130 + 30(B)
     co.scan("B")
-    assert co.total() == 175
+    assert co.total() == 175               # 3A = 130 + 2B = 45
+
+
+# ------------------------------------------
+# EDGE CASES
+# ------------------------------------------
+
+def test_combo_extra_items(rules):
+    assert price("AABCBC", rules) == 160
+    # 2 combos of ABC = 160

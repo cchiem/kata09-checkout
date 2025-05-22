@@ -5,7 +5,7 @@ class Checkout:
         self.pricing_rules = pricing_rules
         self.scanned_items = Counter()
 
-    def scan(self, sku: str):
+    def scan(self, sku):
         self.scanned_items[sku] += 1
 
     def total(self) -> int:

@@ -1,5 +1,5 @@
 class CheckOut:
-    def init(self, rules):
+    def __init__(self, rules):
         self.rules = rules
         self.checkoutItems = {}
 
@@ -14,6 +14,7 @@ class CheckOut:
 
             # Check for a special price
             if "special" in rule:
+                print(f"Special Rule for {item}: {rule["special"]}")
                 special_qty = rule["special"]["quantity"] # Check for a special quantity
                 special_price = rule["special"]["specialPrice"] # Check for a special Price
 
@@ -26,10 +27,16 @@ class CheckOut:
         return total
 
 
-checkout_items = {"A": 2, "B":1}
+# example: checkout_items = {"A": 2, "B":1}
+
 RULES = {
     "A" : {"unitprice": 50, "special": {"quantity": 3, "specialPrice": 130 }},
     "B" : {"unitprice": 30, "special": {"quantity": 2, "specialPrice": 45 }},
     "C" : {"unitprice": 20},
     "D" : {"unitprice": 15},
 }
+
+co = CheckOut(RULES)
+for item in "AABCC":
+    co.scan(item)
+print(co.total())
